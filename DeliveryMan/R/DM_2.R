@@ -381,116 +381,75 @@ sortNodeListOnFvalues <- function(myList) {
 #' Elise Algo2
 eliseAlgorithm <- function(roads, car, packages) {
   # if car is not carrying a package, get which package is closest
-  #print(paste("Location of car:", paste(car$x, car$y, collapse = ", ")))
+  print(paste("Location of car:", paste(car$x, car$y, collapse = ", ")))
+  #print("Packages:")
+  #print(packages)
   
   if (car$load == 0) {
     goal <- findNearestPackage(car, packages)
-    #print(paste("Goal (nearest package):", paste(goal, collapse = ", ")))
+    print(paste("Goal (nearest package):", paste(goal, collapse = ", ")))
     next_move <- runAStar(car$x, car$y, goal, roads)
   } else {
     goal <- packages[car$load, c(3, 4)]
-    #print(paste("Goal (delivery location):", paste(goal, collapse = ", ")))
+    print(paste("Goal (delivery location):", paste(goal, collapse = ", ")))
     next_move <- runAStar(car$x, car$y, goal, roads)
   }
-  #print(paste("Moving direction:", paste(next_move), collapse = ", "))
+  print(paste("Moving direction:", paste(next_move), collapse = ", "))
   car$nextMove = next_move
   return(car)
 }
 
-
 runAStar <- function(start_x, start_y, goal, roads) {
-  open_list <- list()   # priority queue for nodes to be evaluated
-  closed_list <- list() # list of nodes already evaluated
-  
-  # A* starts at the start node
-  start_node <- list(x=start_x, y=start_y, g=0, h=calculateManhattanDistance(start_x, start_y, goal[1], goal[2]), f=0, parent=NULL)
+  open_list <- list() # priority queue, doesn't reset until A* is finished
+  closed_list <- list() # best path list, doesn't reset until A* is finished
+  start_node <- list(x=start_x, y=start_y, g=0, h=calculateManhattanDistance(start_x, start_y, goal[1], goal[2]), f=0, directon=5)
   start_node$f <- start_node$g + start_node$h
-  
+
   open_list <- append(open_list, list(start_node))
-  
-  # Initialize a table to store the best path for each node
-  came_from <- list()
-  
-  while (length(open_list) > 0) {
-    # Sort open_list by f-value and pick the node with the lowest f
+
+  # finds best path from current node to goal
+  # while loop ends when the goal node is at the top of the list
+  while (!( (open_list[[1]]$x == goal[1]) && (open_list[[1]]$y == goal[2]) )) {
+    #print("in while")
+
     open_list <- sortNodeListOnFvalues(open_list)
-    current_node <- open_list[[1]]  # Node with the lowest f-value
-    open_list <- open_list[-1]  # Remove current node from open list
-    
-    # Check if we've reached the goal
-    if (current_node$x == goal[1] && current_node$y == goal[2]) {
-      return(reconstructPath(came_from, current_node))
-    }
-    
-    # Add the current node to the closed list
-    closed_list <- append(closed_list, list(current_node))
-    
-    # Get neighbors of the current node
-    neighbors <- getNeighborsAndTraffic(current_node, roads)
-    
-    for (neighbor in neighbors) {
-      # If the neighbor is in the closed list, skip it
-      if (any(sapply(closed_list, function(n) n$x == neighbor$x && n$y == neighbor$y))) {
-        next
-      }
-      
-      # Calculate the g, h, and f values for the neighbor
-      tentative_g <- current_node$g + neighbor$traffic_cost
+
+    best_node <- open_list[[1]] # best node is the node with the least f-value, this is our best next step
+    #print(paste("best_node:", paste(list(best_node)), collapse = ", "))
+    open_list <- list() #make open list clean for our current node
+    closed_list <- append(closed_list, list(best_node))
+
+    neighbors <- getNeighborsAndTraffic(best_node, roads)
+    for (i in seq_along(neighbors)) {
+      neighbor <- neighbors[[i]]
+
+      # if (any(sapply(closed_list, function(n) n$x == neighbor$x && n$y == neighbor$y))) {
+      #   next
+      # }
+
+      #neighbor$g <- best_node$g + neighbor$traffic_cost
+      neighbor$g <- neighbor$traffic_cost
       neighbor$h <- calculateManhattanDistance(neighbor$x, neighbor$y, goal[1], goal[2])
-      neighbor$f <- tentative_g + neighbor$h
-      
-      # If the neighbor is already in the open list with a lower g value, skip it
-      existing_open_node <- findNodeInList(open_list, neighbor)
-      if (!is.null(existing_open_node) && tentative_g >= existing_open_node$g) {
-        next
-      }
-      
-      # Otherwise, update the neighbor with the best g and parent (current node)
-      neighbor$g <- tentative_g
-      neighbor$parent <- current_node  # Keep track of the path
-      
-      # Record the path for this neighbor
-      came_from[[paste(neighbor$x, neighbor$y, sep = ",")]] <- current_node
-      
-      # If the neighbor is not in the open list, add it
-      if (is.null(existing_open_node)) {
-        open_list <- append(open_list, list(neighbor))
-      }
+      neighbor$f <- neighbor$g + neighbor$h
+      neighbor$first_move <- c(best_node$x, best_node$y)
+
+      neighbors[[i]] <- neighbor
+      #print(paste("neighbor:", paste(list(neighbor)), collapse = ", "))
+      open_list <- append(open_list, list(neighbors[[i]]))
     }
-  }
-  
-  # If we exit the loop without finding the goal, there's no valid path
-  stop("No path found")
-}
 
-# Helper function to find a node in the open list
-findNodeInList <- function(node_list, node) {
-  for (n in node_list) {
-    if (n$x == node$x && n$y == node$y) {
-      return(n)
-    }
-  }
-  return(NULL)
-}
+    open_list <- sortNodeListOnFvalues(open_list) #sorting remaining nodes
 
-# Reconstruct the path by backtracking from the goal to the start
-reconstructPath <- function(came_from, current_node) {
-  path <- list(current_node)
-  while (!is.null(current_node$parent)) {
-    current_node <- current_node$parent
-    path <- append(list(current_node), path)  # Prepend each step to the path
-  }
-  
-  # Return the direction of the first move from the start node
-  #print(paste("Path:", paste(list(path)), collapse = ", "))
+    #input=readline("Enter keypress to process next step. Press q for quit.")
+    #if (input=="q") {stop("Game terminated on user request.")}
 
-  if(length(path) == 1) {
-    direction <- 5
-  
-  } else {
-    next_node <- path[[2]]
-    direction <- next_node$direction
   }
-  
-  return(direction)
+  print("While ends, goal is reached")
+  closed_list <- append(closed_list, list(open_list[[1]]))
+
+  # add backtracking??
+
+  #print(paste("closed_list:", paste(list(closed_list)), collapse = ", "))
+  next_move <- closed_list[[2]]$direction # Takes the next step on the optimal path
+  return(next_move)
 }
