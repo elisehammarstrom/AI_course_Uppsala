@@ -382,14 +382,22 @@ sortNodeListOnFvalues <- function(myList) {
 eliseAlgorithm <- function(roads, car, packages) {
   # if car is not carrying a package, get which package is closest
   print(paste("Location of car:", paste(car$x, car$y, collapse = ", ")))
-  #print("Packages:")
-  #print(packages)
+  print("Packages:")
+  print(packages)
   
   if (car$load == 0) {
     goal <- findNearestPackage(car, packages)
     print(paste("Goal (nearest package):", paste(goal, collapse = ", ")))
     next_move <- runAStar(car$x, car$y, goal, roads)
   } else {
+    # if(car$x == goal[1] && car$y == goal[2]){
+    #   next_move <- 5 # stay still if goal is reached
+    #   print("Car is at pickup/delivery location, standing still...")
+    # } else {
+    #   # goal <- packages[car$load, c(3, 4)]
+    #   # print(paste("Goal (delivery location):", paste(goal, collapse = ", ")))
+    #   # next_move <- runAStar(car$x, car$y, goal, roads)
+    # }
     goal <- packages[car$load, c(3, 4)]
     print(paste("Goal (delivery location):", paste(goal, collapse = ", ")))
     next_move <- runAStar(car$x, car$y, goal, roads)
@@ -406,6 +414,7 @@ runAStar <- function(start_x, start_y, goal, roads) {
   start_node$f <- start_node$g + start_node$h
 
   open_list <- append(open_list, list(start_node))
+  #print(paste("open_list at start:", paste(list(open_list)), collapse = ", "))
 
   # finds best path from current node to goal
   # while loop ends when the goal node is at the top of the list
@@ -413,9 +422,10 @@ runAStar <- function(start_x, start_y, goal, roads) {
     print("in while")
 
     open_list <- sortNodeListOnFvalues(open_list)
+    #print(paste("open_list after sorting 1:", paste(list(open_list)), collapse = ", "))
 
     best_node <- open_list[[1]] # best node is the node with the least f-value, this is our best next step
-    print(paste("best_node:", paste(list(best_node)), collapse = ", "))
+    print(paste("best_node:", pastea(list(best_node)), collapse = ", "))
     open_list <- list() #make open list clean for our current node
     closed_list <- append(closed_list, list(best_node))
 
@@ -438,16 +448,24 @@ runAStar <- function(start_x, start_y, goal, roads) {
       open_list <- append(open_list, list(neighbors[[i]]))
     }
 
+    print(paste("neighbors:", paste(list(neighbors)), collapse = ", "))
+    print(paste("open list INNAN sort:", paste(list(open_list)), collapse = ", "))
+
     open_list <- sortNodeListOnFvalues(open_list) #sorting remaining nodes
+    print(paste("open_list after sorting 2:", paste(list(open_list)), collapse = ", "))
 
     #input=readline("Enter keypress to process next step. Press q for quit.")
     #if (input=="q") {stop("Game terminated on user request.")}
 
   }
+
+  # when goal is reached, add best node to closed list 
   print("While ends, goal is reached")
+  
+  print(paste("open_list after goal is reached - 3:", paste(list(open_list)), collapse = ", "))
   closed_list <- append(closed_list, list(open_list[[1]]))
 
-  # add backtracking??
+  # add backtracking
 
   #print(paste("closed_list:", paste(list(closed_list)), collapse = ", "))
   next_move <- closed_list[[2]]$direction # Takes the next step on the optimal path
