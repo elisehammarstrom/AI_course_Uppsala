@@ -379,10 +379,8 @@ sortNodeListOnFvalues <- function(myList) {
 # BasicDM doesn't oscillate? 
 
 #' Elise Algo2
-eliseAlgorithm <- function(roads, car, packages) {
+deliveryManAlgorithm <- function(roads, car, packages) {
   # if car is not carrying a package, get which package is closest
-  #print(paste("Location of car:", paste(car$x, car$y, collapse = ", ")))
-  
   if (car$load == 0) {
     goal <- findNearestPackage(car, packages)
     #print(paste("Goal (nearest package):", paste(goal, collapse = ", ")))
@@ -463,7 +461,6 @@ runAStar <- function(start_x, start_y, goal, roads) {
   stop("No path found")
 }
 
-# Helper function to find a node in the open list
 findNodeInList <- function(node_list, node) {
   for (n in node_list) {
     if (n$x == node$x && n$y == node$y) {
@@ -478,11 +475,8 @@ reconstructPath <- function(came_from, current_node) {
   path <- list(current_node)
   while (!is.null(current_node$parent)) {
     current_node <- current_node$parent
-    path <- append(list(current_node), path)  # Prepend each step to the path
+    path <- append(list(current_node), path) 
   }
-  
-  # Return the direction of the first move from the start node
-  #print(paste("Path:", paste(list(path)), collapse = ", "))
 
   if(length(path) == 1) {
     direction <- 5
