@@ -306,14 +306,11 @@ updateRoads<-function(hroads,vroads) {
   list (hroads=hroads,vroads=vroads)
 }
 
-# ---------------------- OUR CODE --------
-# TAKE TRAFFIC INTO ACCOUNT HERE as well
+# ---------------------- OUR CODE -------- Results: Mean: 177.424, Std Dev: 39.76066, Time taken: 41.17476 seconds.
 findNearestPackage <- function(car, packages) {
   closest_package <- NULL
   min_distance <- Inf
-  
   for (i in 1:nrow(packages)) {
-    # If package isn't delivered, calculate distance
     if (packages[i, 5] == 0) {
       distance <- calculateManhattanDistance(car$x, car$y, packages[i, 1], packages[i, 2])
       if (distance < min_distance) {
@@ -331,8 +328,6 @@ calculateManhattanDistance <- function(loc1_x, loc1_y, loc2_x, loc2_y) {
 
 getNeighborsAndTraffic <- function(node, roads) {
   neighbors <- list()
-  
-  # Only get valid neighbors within the grid
   if (node$x >= 2) {
     neighbors <- append(neighbors, list(list(x=node$x-1, y=node$y, direction=4, g=0, h=0, f=0, traffic_cost=roads$hroads[node$x - 1, node$y]))) # Left
   }
@@ -345,120 +340,17 @@ getNeighborsAndTraffic <- function(node, roads) {
   if (node$y <= 9) {
     neighbors <- append(neighbors, list(list(x=node$x, y=node$y+1, direction=8, g=0, h=0, f=0, traffic_cost =roads$vroads[node$x, node$y])))  # Up
   }
-  
   return(neighbors)
 }
 
-# sortNodeListOnFvalues <- function(myList) {
-#   f_values <- list()
-#   f_values <- sapply(myList, function(node) node$f)
-#   sorted_indices <- order(f_values)
-#   list_sorted <- myList[sorted_indices]
-#   return(list_sorted)
-# }
-
-
-# if multiple lowst f values exist, sort again based on lowest distance
-sortNodeListOnFvalues <- function(myList) {
-  # Extract f and g values from each node in the list
+sortNodeListOnFvalues <- function(myList) { # if multiple lowst f values exist, sort again based on lowest distance
   f_values <- sapply(myList, function(node) node$f)
   h_values <- sapply(myList, function(node) node$h)
-  
-  # Sort by f values first, and by g values as a secondary criterion
+
   sorted_indices <- order(f_values, h_values)
   
-  # Sort the list using the computed sorted indices
   list_sorted <- myList[sorted_indices]
-  
   return(list_sorted)
-}
-
-
-# NOTES
-# backtrack to find multiple paths/plans
-# BasicDM doesn't oscillate? 
-
-#' Elise Algo2
-deliveryManAlgorithm <- function(roads, car, packages) {
-  # if car is not carrying a package, get which package is closest
-  if (car$load == 0) {
-    goal <- findNearestPackage(car, packages)
-    #print(paste("Goal (nearest package):", paste(goal, collapse = ", ")))
-    next_move <- runAStar(car$x, car$y, goal, roads)
-  } else {
-    goal <- packages[car$load, c(3, 4)]
-    #print(paste("Goal (delivery location):", paste(goal, collapse = ", ")))
-    next_move <- runAStar(car$x, car$y, goal, roads)
-  }
-  #print(paste("Moving direction:", paste(next_move), collapse = ", "))
-  car$nextMove = next_move
-  return(car)
-}
-
-
-runAStar <- function(start_x, start_y, goal, roads) {
-  open_list <- list()   # priority queue for nodes to be evaluated
-  closed_list <- list() # list of nodes already evaluated
-  
-  # A* starts at the start node
-  start_node <- list(x=start_x, y=start_y, g=0, h=calculateManhattanDistance(start_x, start_y, goal[1], goal[2]), f=0, parent=NULL)
-  start_node$f <- start_node$g + start_node$h
-  
-  open_list <- append(open_list, list(start_node))
-  
-  # Initialize a table to store the best path for each node
-  came_from <- list()
-  
-  while (length(open_list) > 0) {
-    # Sort open_list by f-value and pick the node with the lowest f
-    open_list <- sortNodeListOnFvalues(open_list)
-    current_node <- open_list[[1]]  # Node with the lowest f-value
-    open_list <- open_list[-1]  # Remove current node from open list
-    
-    # Check if we've reached the goal
-    if (current_node$x == goal[1] && current_node$y == goal[2]) {
-      return(reconstructPath(came_from, current_node))
-    }
-    
-    # Add the current node to the closed list
-    closed_list <- append(closed_list, list(current_node))
-    
-    # Get neighbors of the current node
-    neighbors <- getNeighborsAndTraffic(current_node, roads)
-    
-    for (neighbor in neighbors) {
-      # If the neighbor is in the closed list, skip it
-      if (any(sapply(closed_list, function(n) n$x == neighbor$x && n$y == neighbor$y))) {
-        next
-      }
-      
-      # Calculate the g, h, and f values for the neighbor
-      tentative_g <- current_node$g + neighbor$traffic_cost
-      neighbor$h <- calculateManhattanDistance(neighbor$x, neighbor$y, goal[1], goal[2])
-      neighbor$f <- tentative_g + neighbor$h
-      
-      # If the neighbor is already in the open list with a lower g value, skip it
-      existing_open_node <- findNodeInList(open_list, neighbor)
-      if (!is.null(existing_open_node) && tentative_g >= existing_open_node$g) {
-        next
-      }
-      
-      # Otherwise, update the neighbor with the best g and parent (current node)
-      neighbor$g <- tentative_g
-      neighbor$parent <- current_node  # Keep track of the path
-      
-      # Record the path for this neighbor
-      came_from[[paste(neighbor$x, neighbor$y, sep = ",")]] <- current_node
-      
-      # If the neighbor is not in the open list, add it
-      if (is.null(existing_open_node)) {
-        open_list <- append(open_list, list(neighbor))
-      }
-    }
-  }
-  
-  # If we exit the loop without finding the goal, there's no valid path
-  stop("No path found")
 }
 
 findNodeInList <- function(node_list, node) {
@@ -470,8 +362,8 @@ findNodeInList <- function(node_list, node) {
   return(NULL)
 }
 
-# Reconstruct the path by backtracking from the goal to the start
-reconstructPath <- function(came_from, current_node) {
+# Reconstructing the path by backtracking from the goal to the start node
+backtrackingPath <- function(came_from, current_node) {
   path <- list(current_node)
   while (!is.null(current_node$parent)) {
     current_node <- current_node$parent
@@ -487,4 +379,65 @@ reconstructPath <- function(came_from, current_node) {
   }
   
   return(direction)
+}
+
+# The code of the code, the functions above are helper func
+deliveryManAlgorithm <- function(roads, car, packages) {
+  if (car$load == 0) {
+    goal <- findNearestPackage(car, packages)
+    next_move <- runAStar(car$x, car$y, goal, roads)
+  } else {
+    goal <- packages[car$load, c(3, 4)]
+    next_move <- runAStar(car$x, car$y, goal, roads)
+  }
+  car$nextMove = next_move
+  return(car)
+}
+
+runAStar <- function(start_x, start_y, goal, roads) {
+  open_list <- list()   # priority queue for nodes to be checked
+  closed_list <- list() # list of already checked nodes
+  
+  start_node <- list(x=start_x, y=start_y, g=0, h=calculateManhattanDistance(start_x, start_y, goal[1], goal[2]), f=0, parent=NULL)
+  start_node$f <- start_node$g + start_node$h
+  
+  open_list <- append(open_list, list(start_node))
+  came_from <- list()
+  
+  while (length(open_list) > 0) {
+    open_list <- sortNodeListOnFvalues(open_list) # Sort open_list by f-value and pick the node with the lowest f
+    current_node <- open_list[[1]]  # Current node is the node with the lowest f-value
+    open_list <- open_list[-1] # Remove current node from the evaluation list
+    
+    if (current_node$x == goal[1] && current_node$y == goal[2]) {
+      return(backtrackingPath(came_from, current_node))
+    }
+    
+    closed_list <- append(closed_list, list(current_node))
+    neighbors <- getNeighborsAndTraffic(current_node, roads) # Get neighbors of the current node
+    
+    for (neighbor in neighbors) {
+      # If the neighbor is in the closed list, skip it
+      if (any(sapply(closed_list, function(n) n$x == neighbor$x && n$y == neighbor$y))) {
+        next
+      }
+      
+      temp_g <- current_node$g + neighbor$traffic_cost
+      neighbor$h <- calculateManhattanDistance(neighbor$x, neighbor$y, goal[1], goal[2])
+      neighbor$f <- temp_g + neighbor$h
+      
+      existing_open_node <- findNodeInList(open_list, neighbor)
+      if (!is.null(existing_open_node) && temp_g >= existing_open_node$g) {
+        next
+      }
+      
+      neighbor$g <- temp_g
+      neighbor$parent <- current_node  # Keep track of the path
+      came_from[[paste(neighbor$x, neighbor$y, sep = ",")]] <- current_node
+      
+      if (is.null(existing_open_node)) {
+        open_list <- append(open_list, list(neighbor))
+      }
+    }
+  }
 }
