@@ -515,17 +515,17 @@ myWC=function(moveInfo,readings,positions,edges,probs) {
  for (waterhole_index in new_options) {
     print("waterhole_index")
     print(waterhole_index)
-    print("updated_probs[waterhole_index, ]")
-    updated_probs[waterhole_index, ]
-    print(updated_probs[waterhole_index, ])
-    if (updated_probs[waterhole_index, ] > best_possible_prob ) {
-      best_possible_prob <- updated_probs[waterhole_index, ]
-      best_possible_move <- waterhole_index
-    }
+    # print("updated_probs[waterhole_index, ]")
+    # updated_probs[waterhole_index, ]
+    # print(updated_probs[waterhole_index, ])
+    # if (updated_probs[waterhole_index, ] > best_possible_prob ) {
+    #   best_possible_prob <- updated_probs[waterhole_index, ]
+    #   best_possible_move <- waterhole_index
+    # }
   }
 
-  print("best_possible_move")
-  print(best_possible_move)
+  # print("best_possible_move")
+  # print(best_possible_move)
    # Decide on the first move
   if (best_possible_move == current_pos) { # if the best possible move is to stay put, then search
     mv2 <- 0  # Search 
