@@ -462,29 +462,36 @@ myWC=function(moveInfo,readings,positions,edges,probs) {
 
   max_index <- which.max(updated_probs)
   max_value <- updated_probs[max_index]
-  print("max_index")
+  print("max_index aka where we think croc is")
   print(max_index)
-  print("max_value")
+  print("max_value aka prob of croc")
   print(max_value)
+
+  print("----------")
 
   # for viable option, get the max value of those, that is the next move
 
   best_possible_prob <- 0 # initialize with 0 prob
   best_possible_move <- 0 # initialize with search move
 
+  #print(updated_probs)
+
+  updated_probs = runForwardAlgo(moveInfo$mem$current_probs, transition_matrix, readings, probs)
+
   for (waterhole_index in options) {
-    updated_probs[waterhole_index]
     print("waterhole_index")
     print(waterhole_index)
-    print("updated_probs[waterhole_index]")
-    print(updated_probs[waterhole_index])
-    if (best_possible_prob < updated_probs[waterhole_index]) {
+    print("updated_probs[waterhole_index, ]")
+    updated_probs[waterhole_index, ]
+    print(updated_probs[waterhole_index, ])
+    if (updated_probs[waterhole_index, ] > best_possible_prob ) {
+      best_possible_prob <- updated_probs[waterhole_index, ]
       best_possible_move <- waterhole_index
     }
   }
 
-  print("best_possible_prob")
-  print(best_possible_prob)
+  print("best_possible_move")
+  print(best_possible_move)
    # Decide on the first move
   if (best_possible_move == current_pos) { # if the best possible move is to stay put, then search
     mv1 <- 0  # Search 
@@ -498,20 +505,29 @@ myWC=function(moveInfo,readings,positions,edges,probs) {
 
   # Find best movement 2
   new_options <- getOptions(mv1, edges)
-  new_option_probs <- moveInfo$mem$current_probs[new_options]
+  #new_option_probs <- moveInfo$mem$current_probs[new_options]
   max_new_index <- which.max(new_option_probs)
   mv2 <- max_new_index
 
-  for (waterhole_index in new_options) {
-    new_option_probs[waterhole_index]
-    if (best_possible_prob < new_option_probs[waterhole_index]) {
+  best_possible_prob <- 0 # initialize with 0 prob
+  best_possible_move <- 0 # initialize with search move
+
+ for (waterhole_index in new_options) {
+    print("waterhole_index")
+    print(waterhole_index)
+    print("updated_probs[waterhole_index, ]")
+    updated_probs[waterhole_index, ]
+    print(updated_probs[waterhole_index, ])
+    if (updated_probs[waterhole_index, ] > best_possible_prob ) {
+      best_possible_prob <- updated_probs[waterhole_index, ]
       best_possible_move <- waterhole_index
     }
   }
 
-  print("best_possible_prob")
-  print(best_possible_prob)
-  if (best_possible_move == mv1) { # if the best possible move is to stay put at mv1, then search there
+  print("best_possible_move")
+  print(best_possible_move)
+   # Decide on the first move
+  if (best_possible_move == current_pos) { # if the best possible move is to stay put, then search
     mv2 <- 0  # Search 
   } else {
   # If the most likely waterhole is not adjacent, stay put and search
@@ -521,7 +537,7 @@ myWC=function(moveInfo,readings,positions,edges,probs) {
   print("mv2")
   print(mv2)
 
-  moveInfo$moves = c(mv1, mv2)
+  #moveInfo$moves = c(mv1, mv2)
 
   return(moveInfo)
 }
