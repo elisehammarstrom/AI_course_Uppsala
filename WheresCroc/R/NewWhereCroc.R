@@ -432,22 +432,40 @@ normalize <- function(probs) {
   return(probs / sum(probs))
 }
 
-# Hidden Markov Model for Croc's position prediction
-updateCrocProbabilities <- function(prior_probs, readings, probs, transition_model) {
+updateCrocProbabilities <- function(prior_probs, readings, probs, transition_model, tourist_positions) {
   num_waterholes <- 40
   posterior_probs <- rep(0, num_waterholes)
   
+  # Standard HMM update
   for (i in 1:num_waterholes) {
     emission_prob <- getEmissionProb(readings, probs, i)
     transition_prob <- sum(prior_probs * transition_model[, i])
-    
     posterior_probs[i] <- emission_prob * transition_prob
   }
   
+  # Normalize probabilities
+  posterior_probs <- normalize(posterior_probs)
+  
+  # Update based on tourist information
+  for (pos in tourist_positions) {
+    if (!is.na(pos)) {
+      if (pos < 0) {
+        # Tourist was just eaten, we know Croc's exact location
+        posterior_probs <- rep(0, num_waterholes)
+        posterior_probs[abs(pos)] <- 1
+        break  # No need to check other tourist, we know Croc's location
+      } else {
+        # Live tourist, Croc can't be here
+        posterior_probs[pos] <- 0
+      }
+    }
+  }
+  
+  # Final normalization
   return(normalize(posterior_probs))
 }
 
-#get the likely croc position in regards to where the turists are
+# get the likely croc position in regards to where the turists are
 getLikelyCrocPosition <- function(turist_one, turist_two, current_props){
   potentialPos = list()
   for(props_index in current_props){
@@ -474,8 +492,9 @@ getLikelyCrocPosition <- function(turist_one, turist_two, current_props){
 
 # Main function implementing the Croc prediction strategy
 myWC <- function(moveInfo, readings, positions, edges, probs) {
-  #turistPosList= list(positions[1],positions[2])
+  turistPosList <- list(positions[1],positions[2])
   #killedPos = someoneEaten(turistPosList)
+  
   # Initialize memory on the first move
   if (moveInfo$mem$status == 0) {
     moveInfo$mem$status <- 1
@@ -484,10 +503,12 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
   }
   
   # Update Croc's position probabilities using the Hidden Markov Model
-  moveInfo$mem$croc_probs <- updateCrocProbabilities(moveInfo$mem$croc_probs, readings, probs, moveInfo$mem$transition_model)
+  moveInfo$mem$croc_probs <- updateCrocProbabilities(moveInfo$mem$croc_probs, readings, probs, moveInfo$mem$transition_model, turistPosList)
   
   # Decide next move: move towards the most likely Croc position
   player_position <- positions[3]
+  print("player_position")
+  print(player_position)
   likely_croc_position <- getLikelyCrocPosition(positions[1], positions[2], moveInfo$mem$croc_probs)
   #likely_croc_position <- which.max(moveInfo$mem$croc_probs)
   #if (killedPos != 0){
@@ -496,7 +517,15 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
   if (likely_croc_position == player_position) {
     # If Croc is most likely at the player's current position, search
     print("makes search")
-    moveInfo$moves <- c(0, 0)
+    mv1 <- 0
+
+    # if search fails, update probabilities
+
+    mv2 <- 0
+
+
+    moveInfo$moves <- c(mv1, mv2)
+
       } 
   else {
     # Otherwise, move towards the most likely Croc position
