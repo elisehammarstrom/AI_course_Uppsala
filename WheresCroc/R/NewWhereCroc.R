@@ -530,6 +530,33 @@ bfs_optimal_path <- function(start, end, edges, top_placements_of_croc_list) {
   return(best_path)
 }
 
+bfs_shortest_path <- function(start, end, edges) {
+  queue <- list(list(start))
+  visited <- rep(FALSE, 40)
+  visited[start] <- TRUE
+  
+  while (length(queue) > 0) {
+    path <- queue[[1]]
+    queue <- queue[-1]
+    node <- path[length(path)]
+    
+    if (node == end) {
+      return(path)
+    }
+    
+    neighbors <- c(edges[edges[,1] == node, 2], edges[edges[,2] == node, 1])
+    for (neighbor in neighbors) {
+      if (!visited[neighbor]) {
+        visited[neighbor] <- TRUE
+        new_path <- c(path, neighbor)
+        queue[[length(queue) + 1]] <- new_path
+      }
+    }
+  }
+  
+  return(NULL)  # No path found
+}
+
 # Improvement1: If croc is in neighbourhood (2 steps away) , just go there
 # if not, find shortest path
 
@@ -631,7 +658,14 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
 
   
   # get best path 
-  best_path <- bfs_optimal_path(player_position, top_croc_position, edges, top_placements_of_croc_list)
+  # if the probability for the top prob placement > 0.5, then just go for shortest path directly
+  if (top_placements_of_croc_list[1] > 0.5 ) {
+    best_path <- bfs_shortest_path(player_position, as.numeric(names(top_placements_of_croc_list)[1]), edges)
+    
+  } else {
+    best_path <- bfs_optimal_path(player_position, as.numeric(names(top_placements_of_croc_list)[1]), edges, top_placements_of_croc_list)
+  }
+  
   cat("Shortest path to likely Croc position:", paste(best_path, collapse = " -> "), "\n")
   best_move <- best_path[[2]]   
   mv1 <- best_move
