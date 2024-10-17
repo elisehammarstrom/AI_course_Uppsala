@@ -465,10 +465,44 @@ updateCrocProbabilities <- function(prior_probs, readings, probs, transition_mod
   return(normalize(posterior_probs))
 }
 
+# Breadth-First Search (BFS) implementation
+findShortestPath <- function(start, end, edges) {
+  if (start == end) return(c(start))
+  
+  queue <- list(list(path = c(start), distance = 0))
+  visited <- rep(FALSE, 40)
+  visited[start] <- TRUE
+  
+  while (length(queue) > 0) {
+    current <- queue[[1]]
+    queue <- queue[-1]
+    
+    last_node <- current$path[length(current$path)]
+    
+    if (last_node == end) {
+      return(current$path)  # Return the path when we reach the end
+    }
+    
+    neighbors <- getOptions(last_node, edges)
+    for (neighbor in neighbors) {
+      if (!visited[neighbor]) {
+        visited[neighbor] <- TRUE
+        new_path <- c(current$path, neighbor)
+        queue[[length(queue) + 1]] <- list(path = new_path, distance = current$distance + 1)
+      }
+    }
+  }
+  
+  return(NULL)  # Return NULL if no path is found
+}
+  
+
 # Main function implementing the Croc prediction strategy
 myWC <- function(moveInfo, readings, positions, edges, probs) {
   turistPosList <- list(positions[1],positions[2])
-  #killedPos = someoneEaten(turistPosList)
+  player_position <- positions[3]
+  print("player_position")
+  print(player_position)
 
   # Initialize memory on the first move
   if (moveInfo$mem$status == 0) {
@@ -481,13 +515,8 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
   moveInfo$mem$croc_probs <- updateCrocProbabilities(moveInfo$mem$croc_probs, readings, probs, moveInfo$mem$transition_model, turistPosList)
   
   # Decide next move: move towards the most likely Croc position
-  player_position <- positions[3]
-  print("player_position")
-  print(player_position)
   likely_croc_position <- which.max(moveInfo$mem$croc_probs)
-  #if (killedPos != 0){
-    #likely_croc_position =killedPos
-  #}
+
   if (likely_croc_position == player_position) {
     # If Croc is most likely at the player's current position, search
     mv1 <- 0
@@ -502,17 +531,6 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
 
     print("moveInfo$mem$croc_probs EFTER: ")
     print(moveInfo$mem$croc_probs)
-
-    # print("Sum of probabilities after update:")
-    # print(sum(moveInfo$mem$croc_probs))
-    
-    # # Verify sum of probabilities is close to 1 (allowing for small floating-point errors)
-    # if (abs(sum(moveInfo$mem$croc_probs) - 1) > 1e-10) {
-    #     warning("Sum of probabilities is not 1 after update!")
-    #     print("Normalizing probabilities...")
-    #     moveInfo$mem$croc_probs <- normalize(moveInfo$mem$croc_probs)
-    #     print("Sum after normalization:", sum(moveInfo$mem$croc_probs))
-    # }
     
     # Recalculate most likely Croc position
     likely_croc_position <- which.max(moveInfo$mem$croc_probs)
