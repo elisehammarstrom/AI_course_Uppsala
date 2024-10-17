@@ -464,10 +464,38 @@ updateCrocProbabilities <- function(prior_probs, readings, probs, transition_mod
   # Final normalization
   return(normalize(posterior_probs))
 }
+
+bfs_shortest_path <- function(start, end, edges) {
+  queue <- list(list(start))
+  visited <- rep(FALSE, 40)
+  visited[start] <- TRUE
+  
+  while (length(queue) > 0) {
+    path <- queue[[1]]
+    queue <- queue[-1]
+    node <- path[length(path)]
+    
+    if (node == end) {
+      return(path)
+    }
+    
+    neighbors <- c(edges[edges[,1] == node, 2], edges[edges[,2] == node, 1])
+    for (neighbor in neighbors) {
+      if (!visited[neighbor]) {
+        visited[neighbor] <- TRUE
+        new_path <- c(path, neighbor)
+        queue[[length(queue) + 1]] <- new_path
+      }
+    }
+  }
+  
+  return(NULL)  # No path found
+}
   
 
 # Main function implementing the Croc prediction strategy
 myWC <- function(moveInfo, readings, positions, edges, probs) {
+  print("--------- running myWC again ----------")
   turistPosList <- list(positions[1],positions[2])
   player_position <- positions[3]
   print("player_position")
@@ -485,26 +513,21 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
   
   # Decide next move: move towards the most likely Croc position
   likely_croc_position <- which.max(moveInfo$mem$croc_probs)
+  print("likely_croc_position:")
+  print(likely_croc_position)
 
   if (likely_croc_position == player_position) {
-    # If Croc is most likely at the player's current position, search
+    # If Croc is most likely at the player's current position, search at players place
     mv1 <- 0
 
-    print("moveInfo$mem$croc_probs INNAN: ")
-    print(moveInfo$mem$croc_probs)
-    print("UPDATING")
+    print("----- Searched at player position, updating probabilities for mv2")
     
     # Update probabilities after failed search
     moveInfo$mem$croc_probs[player_position] <- 0
     moveInfo$mem$croc_probs <- updateCrocProbabilities(moveInfo$mem$croc_probs, readings, probs, moveInfo$mem$transition_model, turistPosList)
-
-    print("moveInfo$mem$croc_probs EFTER: ")
-    print(moveInfo$mem$croc_probs)
     
     # Recalculate most likely Croc position
     likely_croc_position <- which.max(moveInfo$mem$croc_probs)
-    print("likely_croc_position after change in if:")
-    print(likely_croc_position)
     
     # Decide on second move
     options <- getOptions(player_position, edges)
@@ -515,48 +538,27 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
     moveInfo$moves <- c(mv1, mv2)
   }
   else {
-    # Otherwise, move towards the most likely Croc position
-    options <- getOptions(player_position, edges)
+    # Otherwise, move towards the most likely Croc position according to shortest path
+    # IMPROVEMENT, get top 3 most likely spots and search there as well
+    best_path <- bfs_shortest_path(player_position, likely_croc_position, edges)
+    print("best_path: ")
+    cat("Shortest path to likely Croc position:", paste(best_path, collapse = " -> "), "\n")
+    best_move <- best_path[[2]]
     
-    # Find the option closest to the likely Croc position
-    best_move <- options[which.min(abs(options - likely_croc_position))]
-    
-    next_options <- getOptions(best_move, edges)
-    
-    print("Best move")
-    print(best_move)
-    
-    print("Croc prop pos")
-    print(likely_croc_position)
-    
-    if(likely_croc_position == best_move){
-      # Take the move and then search
-      print("makes one move + search")
-      print(c(best_move, 0))
-      moveInfo$moves <- c(best_move, 0)
-      
+    mv1 <- best_move
+
+    if (length(best_path) > 2) {
+      next_best_move <- best_path[[3]]
+      mv2 <- next_best_move
+    } else {
+      mv2 <- 0
     }
-    else{
-      potentialMove = c(0,0)
-      for(option in options){
-        outher_options <- getOptions(option, edges)
-        if (likely_croc_position %in% outher_options){
-          potentialMove <- c(option,likely_croc_position) 
-          break
-          }
-      }
-      if(likely_croc_position %in% potentialMove){
-        moveInfo$moves <- potentialMove
-      }
-      else{
-        next_best_move <- next_options[which.min(abs(next_options - likely_croc_position))]
-        
-        #Take two moves, no search
-        print("makes two moves")
-        print(c(best_move, next_best_move))
-        moveInfo$moves <- c(best_move, next_best_move)
-      }
-    }
+
+    print("moving these two steps")
+    print(c(mv1, mv2))
+
+    moveInfo$moves <- c(mv1, mv2)
+    
   }
   
   return(moveInfo)
