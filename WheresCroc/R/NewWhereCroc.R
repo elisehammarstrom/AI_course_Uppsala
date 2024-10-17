@@ -558,11 +558,13 @@ bfs_shortest_path <- function(start, end, edges) {
 }
 
 # Improvement1: If croc is in neighbourhood (2 steps away) , just go there
-# if not, find shortest path
+# if not, find shortest path. GJORT
 
-# Improvement 2: do not initialize the matrix uniformly (as we have tourists at the start as well)
+# Improvement 2: do not initialize the matrix uniformly (as we have tourists at the start as well). GJORT
 
-# Improvement 3: do BFS search of some kind along a path of probable placements of croc
+# Improvement 3: do BFS search of some kind along a path of probable placements of croc. GJORT
+
+# Improvement 4: search more along the path
   
 
 # Main function implementing the Croc prediction strategy
