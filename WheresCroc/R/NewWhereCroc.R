@@ -464,37 +464,6 @@ updateCrocProbabilities <- function(prior_probs, readings, probs, transition_mod
   # Final normalization
   return(normalize(posterior_probs))
 }
-
-# Breadth-First Search (BFS) implementation
-findShortestPath <- function(start, end, edges) {
-  if (start == end) return(c(start))
-  
-  queue <- list(list(path = c(start), distance = 0))
-  visited <- rep(FALSE, 40)
-  visited[start] <- TRUE
-  
-  while (length(queue) > 0) {
-    current <- queue[[1]]
-    queue <- queue[-1]
-    
-    last_node <- current$path[length(current$path)]
-    
-    if (last_node == end) {
-      return(current$path)  # Return the path when we reach the end
-    }
-    
-    neighbors <- getOptions(last_node, edges)
-    for (neighbor in neighbors) {
-      if (!visited[neighbor]) {
-        visited[neighbor] <- TRUE
-        new_path <- c(current$path, neighbor)
-        queue[[length(queue) + 1]] <- list(path = new_path, distance = current$distance + 1)
-      }
-    }
-  }
-  
-  return(NULL)  # Return NULL if no path is found
-}
   
 
 # Main function implementing the Croc prediction strategy
