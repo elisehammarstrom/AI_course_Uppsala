@@ -465,36 +465,11 @@ updateCrocProbabilities <- function(prior_probs, readings, probs, transition_mod
   return(normalize(posterior_probs))
 }
 
-# get the likely croc position in regards to where the turists are
-getLikelyCrocPosition <- function(turist_one, turist_two, current_props){
-  potentialPos = list()
-  for(props_index in current_props){
-    if (is.na(turist_one) == FALSE){
-      if(turist_one < 0){
-        return(abs(turist_one))
-      }
-      else if(props_index == turist_one){
-        next
-      }
-    }
-    else if (is.na(turist_two) == FALSE){
-      if(turist_two < 0){
-        return(abs(turist_two))
-      }
-      else if(props_index == turist_two){
-        next
-      }
-    }
-    potentialPos <- append(potentialPos, props_index)
-  }
-  return(which.max(potentialPos))
-}
-
 # Main function implementing the Croc prediction strategy
 myWC <- function(moveInfo, readings, positions, edges, probs) {
   turistPosList <- list(positions[1],positions[2])
   #killedPos = someoneEaten(turistPosList)
-  
+
   # Initialize memory on the first move
   if (moveInfo$mem$status == 0) {
     moveInfo$mem$status <- 1
@@ -509,24 +484,49 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
   player_position <- positions[3]
   print("player_position")
   print(player_position)
-  likely_croc_position <- getLikelyCrocPosition(positions[1], positions[2], moveInfo$mem$croc_probs)
-  #likely_croc_position <- which.max(moveInfo$mem$croc_probs)
+  likely_croc_position <- which.max(moveInfo$mem$croc_probs)
   #if (killedPos != 0){
     #likely_croc_position =killedPos
   #}
   if (likely_croc_position == player_position) {
     # If Croc is most likely at the player's current position, search
-    print("makes search")
     mv1 <- 0
 
-    # if search fails, update probabilities
+    print("moveInfo$mem$croc_probs INNAN: ")
+    print(moveInfo$mem$croc_probs)
+    print("UPDATING")
+    
+    # Update probabilities after failed search
+    moveInfo$mem$croc_probs[player_position] <- 0
+    moveInfo$mem$croc_probs <- updateCrocProbabilities(moveInfo$mem$croc_probs, readings, probs, moveInfo$mem$transition_model, turistPosList)
 
-    mv2 <- 0
+    print("moveInfo$mem$croc_probs EFTER: ")
+    print(moveInfo$mem$croc_probs)
 
-
+    # print("Sum of probabilities after update:")
+    # print(sum(moveInfo$mem$croc_probs))
+    
+    # # Verify sum of probabilities is close to 1 (allowing for small floating-point errors)
+    # if (abs(sum(moveInfo$mem$croc_probs) - 1) > 1e-10) {
+    #     warning("Sum of probabilities is not 1 after update!")
+    #     print("Normalizing probabilities...")
+    #     moveInfo$mem$croc_probs <- normalize(moveInfo$mem$croc_probs)
+    #     print("Sum after normalization:", sum(moveInfo$mem$croc_probs))
+    # }
+    
+    # Recalculate most likely Croc position
+    likely_croc_position <- which.max(moveInfo$mem$croc_probs)
+    print("likely_croc_position after change in if:")
+    print(likely_croc_position)
+    
+    # Decide on second move
+    options <- getOptions(player_position, edges)
+    best_move <- options[which.min(abs(options - likely_croc_position))]
+    
+    mv2 <- best_move
+    
     moveInfo$moves <- c(mv1, mv2)
-
-      } 
+  }
   else {
     # Otherwise, move towards the most likely Croc position
     options <- getOptions(player_position, edges)
