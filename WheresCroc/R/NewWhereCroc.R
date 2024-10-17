@@ -491,65 +491,7 @@ updateCrocProbabilities <- function(prior_probs, readings, probs, transition_mod
 #   return(NULL)  # No path found
 # }
 
-bfs_optimal_path <- function(start, end, edges, top_placements_of_croc_list) {
-  # Initialize the queue with the start node
-  queue <- list(list(
-    path = list(start),
-    visited_top = integer(0),
-    priority = 0
-  ))
-  
-  visited <- rep(FALSE, 40)
-  visited[start] <- TRUE
-  
-  while (length(queue) > 0) {
-    # Get the path with the highest priority (lowest numeric value)
-    current_index <- which.min(sapply(queue, function(x) x$priority))
-    current <- queue[[current_index]]
-    queue <- queue[-current_index]
-    
-    path <- current$path
-    visited_top <- current$visited_top
-    
-    node <- path[[length(path)]]
 
-    cat("Path: ", paste(path, collapse = " -> "), "\n")
-
-    # Check if we've reached the end and visited all top probable locations
-    if (node == end) {
-      #return(unlist(path))
-      print("IN IF IN BFS")
-      return(path)
-    }
-    
-    neighbors <- c(edges[edges[,1] == node, 2], edges[edges[,2] == node, 1])
-    for (neighbor in neighbors) {
-      if (!visited[neighbor]) {
-        visited[neighbor] <- TRUE
-        new_path <- c(path, neighbor)
-        
-        # Check if the neighbor is in the top probable locations
-        new_visited_top <- visited_top
-        if (neighbor %in% top_placements_of_croc_list) {
-          new_visited_top <- unique(c(new_visited_top, neighbor))
-        }
-        
-        # Calculate priority (lower is better)
-        # Balance between path length and number of top locations visited
-        priority <- length(new_path) - (length(new_visited_top) * 10)
-        
-        # Add to queue
-        queue <- c(queue, list(list(
-          path = new_path,
-          visited_top = new_visited_top,
-          priority = priority
-        )))
-      }
-    }
-  }
-  
-  return(NULL)  # No path found
-}
 
 get_top_n_probs <- function(probs, n = 3) {
   # Get the indices of the top N probabilities
@@ -561,6 +503,73 @@ get_top_n_probs <- function(probs, n = 3) {
   
   return(top_probs)
 }
+
+bfs_optimal_path <- function(start, end, edges, top_placements_of_croc_list) {
+  num_waterholes <- 40
+  queue <- list(list(
+    path = c(start),
+    visited_top = integer(0),
+    score = 0
+  ))
+  
+  best_path <- NULL
+  best_score <- -Inf
+  visited <- rep(FALSE, num_waterholes)
+  visited[start] <- TRUE
+  
+  while (length(queue) > 0) {
+    current <- queue[[1]]
+    queue <- queue[-1]
+    
+    path <- current$path
+    visited_top <- current$visited_top
+    score <- current$score
+    node <- path[length(path)]
+    
+    # Update best path if we've reached the end
+    if (node == end) {
+      if (score > best_score) {
+        best_path <- path
+        best_score <- score
+      }
+      next
+    }
+    
+    # Explore neighbors
+    neighbors <- c(edges[edges[,1] == node, 2], edges[edges[,2] == node, 1])
+    for (neighbor in neighbors) {
+      if (!visited[neighbor]) {
+        visited[neighbor] <- TRUE
+        new_path <- c(path, neighbor)
+        
+        # Update score: prioritize shorter paths and visiting top placements
+        new_score <- score - 1  # Penalize for each step
+        if (neighbor %in% names(top_placements_of_croc_list)) {
+          new_score <- new_score + 10 * top_placements_of_croc_list[as.character(neighbor)]
+        }
+        
+        # Add to queue
+        queue <- c(queue, list(list(
+          path = new_path,
+          visited_top = c(visited_top, neighbor),
+          score = new_score
+        )))
+      }
+    }
+    
+    # Sort queue by score (descending order)
+    queue <- queue[order(sapply(queue, function(x) x$score), decreasing = TRUE)]
+  }
+  
+  return(best_path)
+}
+
+# Improvement1: If croc is in neighbourhood (2 steps away) , just go there
+# if not, find shortest path
+
+# Improvement 2: do not initialize the matrix uniformly (as we have tourists at the start as well)
+
+# Improvement 3: do BFS search of some kind along a path of probable placements of croc
   
 
 # Main function implementing the Croc prediction strategy
@@ -572,6 +581,7 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
   print(player_position)
 
   # Initialize memory on the first move
+  # add tourist locations here!! 
   if (moveInfo$mem$status == 0) {
     moveInfo$mem$status <- 1
     moveInfo$mem$croc_probs <- rep(1 / 40, 40)  # Initial uniform probability distribution
@@ -587,16 +597,16 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
   print(likely_croc_position)
 
   # Instead of 1st best waterhole of croc, get top 3 places
-  top_placements_of_croc_list <- get_top_n_probs(moveInfo$mem$croc_probs, n = 5)
+  top_placements_of_croc_list <- get_top_n_probs(moveInfo$mem$croc_probs, n = 3)
   print("top_placements_of_croc_list:")
   print(top_placements_of_croc_list)
 
-  print("Assess probabilites of the croc prob matrix: ")
-  print(moveInfo$mem$croc_probs)
+  #print("Assess probabilites of the croc prob matrix: ")
+  #print(moveInfo$mem$croc_probs)
 
   # Uncomment these two rows to pause after each move
-  #cat("\nPress Enter to continue to the next move...")
-  #invisible(readline())
+  cat("\nPress Enter to continue to the next move...")
+  invisible(readline())
 
   if (likely_croc_position == player_position) {
     # If Croc is most likely at the player's current position, search at players place
@@ -617,6 +627,40 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
     
     mv2 <- best_move
     
+    moveInfo$moves <- c(mv1, mv2)
+  } 
+
+  #else if (likely_croc_position %in% options) {
+  else if (top_placements_of_croc_list %in% options) {
+    # then do not run BFS 
+    # instead make the most probable move and then search
+    # for(option in options){
+    #   for(possible_croc_position in likely_croc_position) {
+    #     if(possible_croc_position == option){
+    #       mv1 <- option # then go to that place and search
+    #       mv2 <- 0
+    #     }
+    #     else {
+    #       outher_options <- getOptions(option, edges)
+    #       if (possible_croc_position %in% outher_options){
+    #         mv1 <- option
+    #         mv2 <- possible_croc_position
+    #         break
+    #       }
+    #     }
+    #   } 
+    # }
+
+    for(option in options){
+      mv1 <- 0
+      mv2 <- 0
+      # for(possible_croc_position in top_placements_of_croc_list) {
+      #   if(possible_croc_position == option){
+      #     mv1 <- option # then go to that place and search
+      #     mv2 <- 0
+      #   }
+      # } 
+    }
     moveInfo$moves <- c(mv1, mv2)
   }
   else {
