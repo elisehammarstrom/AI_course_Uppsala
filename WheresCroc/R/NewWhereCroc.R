@@ -552,7 +552,11 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
   # add tourist locations here!! 
   if (moveInfo$mem$status == 0) {
     moveInfo$mem$status <- 1
-    moveInfo$mem$croc_probs <- rep(1 / 40, 40)  # Initial uniform probability distribution
+    moveInfo$mem$croc_probs <- rep(1 / 38, 40)  # Initial uniform probability distribution
+    moveInfo$mem$croc_probs[turistPosList[[1]]] <- 0
+    moveInfo$mem$croc_probs[turistPosList[[2]]] <- 0
+    #print(" moveInfo$mem$croc_probs: ")
+    #print( moveInfo$mem$croc_probs)
     moveInfo$mem$transition_model <- getTransitionModel(edges)
   }
   
@@ -575,7 +579,7 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
     # If Croc is most likely at the player's current position, search at players position
     mv1 <- 0
 
-    # Update probabilities after assumed failed search
+    # Update probabilities after "assumed" failed search
     moveInfo$mem$croc_probs[player_position] <- 0
     moveInfo$mem$croc_probs <- updateCrocProbabilities(moveInfo$mem$croc_probs, readings, probs, moveInfo$mem$transition_model, turistPosList)
     
@@ -583,8 +587,7 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
     top_placements_of_croc_list <- get_top_n_probs(moveInfo$mem$croc_probs, n = 3)
     top_croc_position <- as.numeric(names(top_placements_of_croc_list)[1])
     
-    # Decide on second move - ÄNDRA !!!  så vi ej använder absolutvärde här på noderna, det är ej distansen
-    #best_move <- options[which.min(abs(options - top_placements_of_croc_list[1]))]
+    # Decide on second move
     best_path <- bfs_optimal_path(player_position, top_croc_position, edges, top_placements_of_croc_list)
     cat("Shortest path to likely Croc position:", paste(best_path, collapse = " -> "), "\n")
 
@@ -592,11 +595,8 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
       best_move <- best_path[[1]]
     } else {
       best_move <- best_path[[2]]
-
     }
-    
     mv2 <- best_move
-    
     moveInfo$moves <- c(mv1, mv2)
   } 
   else {
@@ -626,6 +626,8 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
         } 
       }
     }
+
+    
 
   
   # get best path 
