@@ -432,6 +432,7 @@ normalize <- function(probs) {
 }
 
 updateCrocProbabilities <- function(prior_probs, readings, probs, transition_model, tourist_positions) {
+  epsilon = 1e-5
   num_waterholes <- 40
   posterior_probs <- rep(0, num_waterholes)
   
@@ -441,8 +442,11 @@ updateCrocProbabilities <- function(prior_probs, readings, probs, transition_mod
     transition_prob <- sum(prior_probs * transition_model[, i])
     posterior_probs[i] <- emission_prob * transition_prob
   }
+
+  # Apply epsilon scaling - technique called epsilon smoothing, as we scale everything with epsilon
+  # so the probs arent as close to 0 
+  posterior_probs <- posterior_probs + epsilon
   
-  # Normalize probabilities
   posterior_probs <- normalize(posterior_probs)
   
   # Update based on tourist information
@@ -570,11 +574,9 @@ bfs_shortest_path <- function(start, end, edges) {
 
 # Main function implementing the Croc prediction strategy
 myWC <- function(moveInfo, readings, positions, edges, probs) {
-  print("--------- running myWC again ----------")
   turistPosList <- list(positions[1],positions[2])
   player_position <- positions[3]
-  print("player_position")
-  print(player_position)
+
 
   best_path <- 0
 
@@ -585,8 +587,6 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
     moveInfo$mem$croc_probs <- rep(1 / 38, 40)  # Initial uniform probability distribution
     moveInfo$mem$croc_probs[turistPosList[[1]]] <- 0
     moveInfo$mem$croc_probs[turistPosList[[2]]] <- 0
-    #print(" moveInfo$mem$croc_probs: ")
-    #print( moveInfo$mem$croc_probs)
     moveInfo$mem$transition_model <- getTransitionModel(edges)
   }
   
