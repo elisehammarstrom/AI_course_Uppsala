@@ -450,8 +450,9 @@ updateCrocProbabilities <- function(prior_probs, readings, probs, transition_mod
     if (!is.na(pos)) {
       if (pos < 0) {
         # Tourist was just eaten, we know Croc's exact location
-        posterior_probs <- rep(0, num_waterholes)
-        posterior_probs[abs(pos)] <- 1
+        #posterior_probs <- rep(0, num_waterholes)
+        posterior_probs <- rep(0.001, num_waterholes)
+        posterior_probs[abs(pos)] <- 0.996
         break  # No need to check other tourist, we know Croc's location
       } else {
         # Live tourist, Croc can't be here
@@ -599,8 +600,8 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
   top_croc_position <- as.numeric(names(top_placements_of_croc_list)[1])
 
   # Uncomment these two rows to pause after each move
-  cat("\nPress Enter to continue to the next move...")
-  invisible(readline())
+  #cat("\nPress Enter to continue to the next move...")
+  #invisible(readline())
 
   options <- getOptions(player_position, edges)
 
