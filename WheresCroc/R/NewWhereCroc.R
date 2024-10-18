@@ -599,8 +599,8 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
   top_croc_position <- as.numeric(names(top_placements_of_croc_list)[1])
 
   # Uncomment these two rows to pause after each move
-  #cat("\nPress Enter to continue to the next move...")
-  #invisible(readline())
+  cat("\nPress Enter to continue to the next move...")
+  invisible(readline())
 
   options <- getOptions(player_position, edges)
 
@@ -661,10 +661,12 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
   
   # get best path 
   # if the probability for the top prob placement > 0.5, then just go for shortest path directly
-  if (top_placements_of_croc_list[1] > 0.5 ) {
+  if (top_placements_of_croc_list[[1]] > 0.4 ) {
+    print("TAKING SHORTEST PATH")
     best_path <- bfs_shortest_path(player_position, as.numeric(names(top_placements_of_croc_list)[1]), edges)
     
   } else {
+    print("taking a longer path")
     best_path <- bfs_optimal_path(player_position, as.numeric(names(top_placements_of_croc_list)[1]), edges, top_placements_of_croc_list)
   }
   
