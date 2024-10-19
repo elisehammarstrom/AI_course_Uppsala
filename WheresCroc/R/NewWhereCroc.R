@@ -432,7 +432,7 @@ normalize <- function(probs) {
 }
 
 updateCrocProbabilities <- function(prior_probs, readings, probs, transition_model, tourist_positions) {
-  epsilon = 1e-5
+  epsilon <- 1e-10  # Small value to prevent zero probabilities
   num_waterholes <- 40
   posterior_probs <- rep(0, num_waterholes)
   
@@ -442,11 +442,11 @@ updateCrocProbabilities <- function(prior_probs, readings, probs, transition_mod
     transition_prob <- sum(prior_probs * transition_model[, i])
     posterior_probs[i] <- emission_prob * transition_prob
   }
-
-  # Apply epsilon scaling - technique called epsilon smoothing, as we scale everything with epsilon
-  # so the probs arent as close to 0 
+  
+  # Apply epsilon smoothing
   posterior_probs <- posterior_probs + epsilon
   
+  # Normalize probabilities
   posterior_probs <- normalize(posterior_probs)
   
   # Update based on tourist information
@@ -454,17 +454,17 @@ updateCrocProbabilities <- function(prior_probs, readings, probs, transition_mod
     if (!is.na(pos)) {
       if (pos < 0) {
         # Tourist was just eaten, we know Croc's exact location
-        #posterior_probs <- rep(0, num_waterholes)
-        posterior_probs <- rep(0.001, num_waterholes)
-        posterior_probs[abs(pos)] <- 0.996
+        posterior_probs <- rep(epsilon, num_waterholes)
+        posterior_probs[abs(pos)] <- 1 - (39 * epsilon)  # Ensure it sums to 1
         break  # No need to check other tourist, we know Croc's location
       } else {
         # Live tourist, Croc can't be here
-        posterior_probs[pos] <- 0
+        posterior_probs[pos] <- epsilon
       }
     }
   }
   
+  # Final normalization
   return(normalize(posterior_probs))
 }
 
@@ -574,9 +574,11 @@ bfs_shortest_path <- function(start, end, edges) {
 
 # Main function implementing the Croc prediction strategy
 myWC <- function(moveInfo, readings, positions, edges, probs) {
+  print("--------- running myWC again ----------")
   turistPosList <- list(positions[1],positions[2])
   player_position <- positions[3]
-
+  print("player_position")
+  print(player_position)
 
   best_path <- 0
 
@@ -587,6 +589,8 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
     moveInfo$mem$croc_probs <- rep(1 / 38, 40)  # Initial uniform probability distribution
     moveInfo$mem$croc_probs[turistPosList[[1]]] <- 0
     moveInfo$mem$croc_probs[turistPosList[[2]]] <- 0
+    #print(" moveInfo$mem$croc_probs: ")
+    #print( moveInfo$mem$croc_probs)
     moveInfo$mem$transition_model <- getTransitionModel(edges)
   }
   
