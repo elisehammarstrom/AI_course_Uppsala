@@ -399,9 +399,8 @@ getOptions=function(point,edges) {
 }
 
 
-# -------- My code starts here
+# ------------------------ Our code starts here ------------------------
 
-# Transition model calculation (unchanged)
 getTransitionModel <- function(edges) {
   num_waterholes <- 40
   transition_matrix <- matrix(0, nrow=num_waterholes, ncol=num_waterholes)
@@ -415,50 +414,47 @@ getTransitionModel <- function(edges) {
   return(transition_matrix)
 }
 
-# Emission probability calculation (optimized)
 getEmissionProb <- function(readings, probs, waterhole_number) {
-  # Calculate the probability of each reading matching the waterhole distribution
   sal_prob <- dnorm(readings[1], mean=probs$salinity[waterhole_number, 1], sd=probs$salinity[waterhole_number, 2])
   phos_prob <- dnorm(readings[2], mean=probs$phosphate[waterhole_number, 1], sd=probs$phosphate[waterhole_number, 2])
   nitro_prob <- dnorm(readings[3], mean=probs$nitrogen[waterhole_number, 1], sd=probs$nitrogen[waterhole_number, 2])
   
-  # Return the product of the probabilities (independence assumption)
   return(sal_prob * phos_prob * nitro_prob)
 }
 
-# Normalize probabilities
+
 normalize <- function(probs) {
   return(probs / sum(probs))
 }
 
 updateCrocProbabilities <- function(prior_probs, readings, probs, transition_model, tourist_positions) {
-  epsilon <- 1e-10  # Small value to prevent zero probabilities
+  epsilon <- 1e-10  # We got best improvement with epsilon smoothing aka small value to prevent zero probabilities
   num_waterholes <- 40
   posterior_probs <- rep(0, num_waterholes)
   
-  # Standard HMM update
+  # Do the HMM update
   for (i in 1:num_waterholes) {
     emission_prob <- getEmissionProb(readings, probs, i)
     transition_prob <- sum(prior_probs * transition_model[, i])
     posterior_probs[i] <- emission_prob * transition_prob
   }
   
-  # Apply epsilon smoothing
+  # Apply epsilon smoothing and normalize
+  # Epsilon smoothing takes into account the scenario when values are really close to 0
+  # So it doesnt get strange behaviour with values close to 0
   posterior_probs <- posterior_probs + epsilon
-  
-  # Normalize probabilities
   posterior_probs <- normalize(posterior_probs)
   
-  # Update based on tourist information
+  # Taking account tourist locations
   for (pos in tourist_positions) {
     if (!is.na(pos)) {
       if (pos < 0) {
-        # Tourist was just eaten, we know Croc's exact location
+        # Tourist was just eaten, we know Croc's exact location!
         posterior_probs <- rep(epsilon, num_waterholes)
-        posterior_probs[abs(pos)] <- 1 - (39 * epsilon)  # Ensure it sums to 1
-        break  # No need to check other tourist, we know Croc's location
+        posterior_probs[abs(pos)] <- 1 - (39 * epsilon)  # We make sure it sums to 1
+        break 
       } else {
-        # Live tourist, Croc can't be here
+        # Alive tourist, Croc can't be here so update probs accordingly
         posterior_probs[pos] <- epsilon
       }
     }
@@ -475,7 +471,38 @@ get_top_n_probs <- function(probs, n = 3) {
   return(top_probs)
 }
 
+bfs_shortest_path <- function(start, end, edges) {
+  # This is normal BFS
+  queue <- list(list(start))
+  visited <- rep(FALSE, 40)
+  visited[start] <- TRUE
+  
+  while (length(queue) > 0) {
+    path <- queue[[1]]
+    queue <- queue[-1]
+    node <- path[length(path)]
+    
+    if (node == end) {
+      return(path)
+    }
+    
+    neighbors <- c(edges[edges[,1] == node, 2], edges[edges[,2] == node, 1])
+    for (neighbor in neighbors) {
+      if (!visited[neighbor]) {
+        visited[neighbor] <- TRUE
+        new_path <- c(path, neighbor)
+        queue[[length(queue) + 1]] <- new_path
+      }
+    }
+  }
+  
+  return(NULL)  # Return null if no path is found
+}
+
 bfs_optimal_path <- function(start, end, edges, top_placements_of_croc_list) {
+  # This version of BFS creates a score of both shortest path to goal as well as if we can check more probable 
+  # locations along the path
+  # The idea is to get the best path that returns the shortest path WHILE still including probable croc positions
   num_waterholes <- 40
   queue <- list(list(
     path = c(start),
@@ -506,20 +533,20 @@ bfs_optimal_path <- function(start, end, edges, top_placements_of_croc_list) {
       next
     }
     
-    # Explore neighbors
+    # Explore neighbors 
     neighbors <- c(edges[edges[,1] == node, 2], edges[edges[,2] == node, 1])
     for (neighbor in neighbors) {
       if (!visited[neighbor]) {
         visited[neighbor] <- TRUE
         new_path <- c(path, neighbor)
         
-        # Update score: prioritize shorter paths and visiting top placements
-        new_score <- score - 1  # Penalize for each step
+        # Update score: prioritize shorter paths and visiting top croc placements
+        new_score <- score - 1  # Apply lil' penalization for each step taken
         if (neighbor %in% names(top_placements_of_croc_list)) {
           new_score <- new_score + 10 * top_placements_of_croc_list[as.character(neighbor)]
         }
         
-        # Add to queue
+        # Now add to queue
         queue <- c(queue, list(list(
           path = new_path,
           visited_top = c(visited_top, neighbor),
@@ -528,82 +555,45 @@ bfs_optimal_path <- function(start, end, edges, top_placements_of_croc_list) {
       }
     }
     
-    # Sort queue by score (descending order)
+    # Sort descendingly, so the highest score path is first in order
     queue <- queue[order(sapply(queue, function(x) x$score), decreasing = TRUE)]
   }
   
   return(best_path)
 }
 
-bfs_shortest_path <- function(start, end, edges) {
-  queue <- list(list(start))
-  visited <- rep(FALSE, 40)
-  visited[start] <- TRUE
-  
-  while (length(queue) > 0) {
-    path <- queue[[1]]
-    queue <- queue[-1]
-    node <- path[length(path)]
-    
-    if (node == end) {
-      return(path)
-    }
-    
-    neighbors <- c(edges[edges[,1] == node, 2], edges[edges[,2] == node, 1])
-    for (neighbor in neighbors) {
-      if (!visited[neighbor]) {
-        visited[neighbor] <- TRUE
-        new_path <- c(path, neighbor)
-        queue[[length(queue) + 1]] <- new_path
-      }
-    }
-  }
-  
-  return(NULL)  # No path found
-}
-
-# Improvement1: If croc is in neighbourhood (2 steps away) , just go there
-# if not, find shortest path. GJORT
-
-# Improvement 2: do not initialize the matrix uniformly (as we have tourists at the start as well). GJORT
-
-# Improvement 3: do BFS search of some kind along a path of probable placements of croc. GJORT
-
+# Improvement1: If croc is in neighbourhood (2 steps away) , just go there. If not, find shortest path. DONE
+# Improvement 2: do not initialize the matrix uniformly (as we have tourists at the start as well). DONE
+# Improvement 3: do BFS search of some kind along a path of probable placements of croc. DONE
 # Improvement 4: search more along the path
   
 
 # Main function implementing the Croc prediction strategy
 myWC <- function(moveInfo, readings, positions, edges, probs) {
-  print("--------- running myWC again ----------")
+  # Initialize our variables
   turistPosList <- list(positions[1],positions[2])
   player_position <- positions[3]
-  print("player_position")
-  print(player_position)
-
   best_path <- 0
 
   # Initialize memory on the first move
-  # add tourist locations here!! 
+  # Not entrirely uniform distribution as we take the tourists locations into account at the very start
+  # As it seems to be unlikely that tourists gets eaten the second the game starts
   if (moveInfo$mem$status == 0) {
     moveInfo$mem$status <- 1
-    moveInfo$mem$croc_probs <- rep(1 / 38, 40)  # Initial uniform probability distribution
+    moveInfo$mem$croc_probs <- rep(1 / 38, 40) 
     moveInfo$mem$croc_probs[turistPosList[[1]]] <- 0
     moveInfo$mem$croc_probs[turistPosList[[2]]] <- 0
-    #print(" moveInfo$mem$croc_probs: ")
-    #print( moveInfo$mem$croc_probs)
     moveInfo$mem$transition_model <- getTransitionModel(edges)
   }
   
   # Update Croc's position probabilities using the Hidden Markov Model
   moveInfo$mem$croc_probs <- updateCrocProbabilities(moveInfo$mem$croc_probs, readings, probs, moveInfo$mem$transition_model, turistPosList)
   
-  # Decide next move: move towards the most likely Croc positions
+  # Decide next move: move towards the most likely Croc positions. We take account of the top 3 probable placements
   top_placements_of_croc_list <- get_top_n_probs(moveInfo$mem$croc_probs, n = 3)
-  print("top_placements_of_croc_list:")
-  print(top_placements_of_croc_list)
   top_croc_position <- as.numeric(names(top_placements_of_croc_list)[1])
 
-  # Uncomment these two rows to pause after each move
+  # We used this for pausing the game and assess optimal gameplay at each step
   #cat("\nPress Enter to continue to the next move...")
   #invisible(readline())
 
@@ -613,7 +603,9 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
     # If Croc is most likely at the player's current position, search at players position
     mv1 <- 0
 
-    # Update probabilities after "assumed" failed search
+    # We bluntly assume the search fails, and calculate the next most probable location of the croc accordingly
+    # This assumption doesnt influence the game if the croc was searched for and found, as the game ends
+    # We're just prepping for if the searched failed
     moveInfo$mem$croc_probs[player_position] <- 0
     moveInfo$mem$croc_probs <- updateCrocProbabilities(moveInfo$mem$croc_probs, readings, probs, moveInfo$mem$transition_model, turistPosList)
     
@@ -623,7 +615,6 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
     
     # Decide on second move
     best_path <- bfs_optimal_path(player_position, top_croc_position, edges, top_placements_of_croc_list)
-    cat("Shortest path to likely Croc position:", paste(best_path, collapse = " -> "), "\n")
 
     if(length(best_path) == 1) {
       best_move <- best_path[[1]]
@@ -634,7 +625,7 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
     moveInfo$moves <- c(mv1, mv2)
   } 
   else {
-    # If most probable croc positions are within one or two moves for us
+    # If most probable croc positions are within one or two moves from us
     # then do not run BFS, instead make the most probable move and then search
     for(option in options){
       outher_options <- getOptions(option, edges)
@@ -645,7 +636,6 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
           mv2 <- 0
           moveInfo$mem$croc_probs[mv1] <- 0
           moveInfo$mem$croc_probs <- updateCrocProbabilities(moveInfo$mem$croc_probs, readings, probs, moveInfo$mem$transition_model, turistPosList)
-          #print(paste("Croc likely at adjacent node", option, ". Moving there and searching."))
           moveInfo$moves <- c(mv1, mv2)
           break
         }
@@ -662,20 +652,15 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
     }
 
     
-
   
-  # get best path 
-  # if the probability for the top prob placement > 0.5, then just go for shortest path directly
+  # If croc is likely > 2 nodes away from us, get best path to croc
+  # if the probability for the top prob placement > 0.4, then just go for shortest path directly
   if (top_placements_of_croc_list[[1]] > 0.4 ) {
-    print("TAKING SHORTEST PATH")
     best_path <- bfs_shortest_path(player_position, as.numeric(names(top_placements_of_croc_list)[1]), edges)
-    
   } else {
-    print("taking a longer path")
     best_path <- bfs_optimal_path(player_position, as.numeric(names(top_placements_of_croc_list)[1]), edges, top_placements_of_croc_list)
   }
   
-  cat("Shortest path to likely Croc position:", paste(best_path, collapse = " -> "), "\n")
   best_move <- best_path[[2]]   
   mv1 <- best_move
 
@@ -687,9 +672,6 @@ myWC <- function(moveInfo, readings, positions, edges, probs) {
   else {
     mv2 <- 0
   }
-  
-  print("moving these two steps")
-  print(c(mv1, mv2))
 
   moveInfo$moves <- c(mv1, mv2)
     
